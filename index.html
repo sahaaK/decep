@@ -1,0 +1,1134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Word Spy - The Imposter Word Game</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/animejs@3.2.1/lib/anime.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-database-compat.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+        
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #e4e8f0 100%);
+            min-height: 100vh;
+        }
+        
+        .card {
+            box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 35px -10px rgba(0, 0, 0, 0.15);
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 7px 20px -5px rgba(102, 126, 234, 0.5);
+        }
+        
+        .btn-secondary {
+            background: linear-gradient(135deg, #fbc2eb 0%, #a6c1ee 100%);
+            transition: all 0.3s ease;
+        }
+        
+        .btn-secondary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 7px 20px -5px rgba(251, 194, 235, 0.5);
+        }
+        
+        .btn-danger {
+            background: linear-gradient(135deg, #ff758c 0%, #ff7eb3 100%);
+            transition: all 0.3s ease;
+        }
+        
+        .btn-danger:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 7px 20px -5px rgba(255, 117, 140, 0.5);
+        }
+        
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+                box-shadow: 0 0 0 0 rgba(102, 126, 234, 0.7);
+            }
+            70% {
+                transform: scale(1.05);
+                box-shadow: 0 0 0 10px rgba(102, 126, 234, 0);
+            }
+            100% {
+                transform: scale(1);
+                box-shadow: 0 0 0 0 rgba(102, 126, 234, 0);
+            }
+        }
+        
+        .floating {
+            animation: floating 3s ease-in-out infinite;
+        }
+        
+        @keyframes floating {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0px); }
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .word-bubble {
+            position: relative;
+            background: white;
+            border-radius: 1rem;
+            padding: 1rem;
+            margin: 0.5rem;
+            box-shadow: 0 4px 15px -5px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+        }
+        
+        .word-bubble:hover {
+            transform: scale(1.05);
+        }
+        
+        .player-card {
+            transition: all 0.3s ease;
+        }
+        
+        .player-card:hover {
+            transform: scale(1.03);
+        }
+        
+        .impostor {
+            position: relative;
+        }
+        
+        .impostor::after {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(255, 117, 140, 0.1) 0%, rgba(255, 126, 179, 0.2) 100%);
+            border-radius: 0.5rem;
+            z-index: -1;
+        }
+
+        .impostor-badge {
+            display: none;
+        }
+
+        .impostor .impostor-badge {
+            display: block;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+    <!-- Header -->
+    <header class="bg-white shadow-sm py-4">
+        <div class="container mx-auto px-4 flex justify-between items-center">
+            <h1 class="text-3xl font-bold bg-gradient-to-r from-purple-600 to-blue-500 bg-clip-text text-transparent">Word Spy</h1>
+            <div id="player-info" class="hidden items-center space-x-2">
+                <div class="w-8 h-8 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 flex items-center justify-center text-white font-bold" id="player-avatar">Y</div>
+                <span id="player-name" class="font-medium">Player</span>
+                <span id="player-impostor-badge" class="impostor-badge text-xs px-2 py-1 bg-gradient-to-r from-red-500 to-pink-500 text-white rounded-full">Impostor</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-grow container mx-auto px-4 py-8">
+        <!-- Home Screen -->
+        <div id="home-screen" class="max-w-3xl mx-auto text-center fade-in">
+            <div class="floating mb-8">
+                <img src="https://cdn-icons-png.flaticon.com/512/4569/4569739.png" alt="Word Spy Logo" class="w-40 h-40 mx-auto">
+            </div>
+            <h2 class="text-4xl font-bold text-gray-800 mb-4">Word Spy</h2>
+            <p class="text-xl text-gray-600 mb-8">A game of words and deception. Can you spot the impostor?</p>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <div class="card bg-white rounded-xl p-6">
+                    <h3 class="text-2xl font-bold text-gray-800 mb-3">Create Game</h3>
+                    <p class="text-gray-600 mb-4">Start a new game and invite friends</p>
+                    <input type="text" id="player-name-input" placeholder="Your name" class="w-full px-4 py-2 mb-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
+                    <button id="create-game-btn" class="btn-primary w-full py-3 px-6 rounded-lg text-white font-bold">Create Room</button>
+                </div>
+                
+                <div class="card bg-white rounded-xl p-6">
+                    <h3 class="text-2xl font-bold text-gray-800 mb-3">Join Game</h3>
+                    <p class="text-gray-600 mb-4">Enter a room code to join</p>
+                    <input type="text" id="player-name-input-join" placeholder="Your name" class="w-full px-4 py-2 mb-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
+                    <input type="text" id="room-code-input" placeholder="Room code" class="w-full px-4 py-2 mb-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
+                    <button id="join-game-btn" class="btn-secondary w-full py-3 px-6 rounded-lg text-white font-bold">Join Room</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Lobby Screen -->
+        <div id="lobby-screen" class="hidden max-w-3xl mx-auto text-center">
+            <div class="card bg-white rounded-xl p-6 mb-6 fade-in">
+                <h2 class="text-3xl font-bold text-gray-800 mb-2">Room: <span id="room-code-display" class="text-purple-600">ABCD</span></h2>
+                <p class="text-gray-600 mb-4">Share this code with friends to join</p>
+                
+                <div class="flex justify-center mb-6">
+                    <button id="copy-room-code" class="btn-secondary py-2 px-4 rounded-lg text-white font-bold flex items-center space-x-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
+                            <path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" />
+                        </svg>
+                        <span>Copy Code</span>
+                    </button>
+                </div>
+                
+                <div class="mb-6">
+                    <h3 class="text-xl font-bold text-gray-800 mb-4">Players (<span id="player-count">1</span>/8)</h3>
+                    <div id="players-list" class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <!-- Player cards will be added here -->
+                    </div>
+                </div>
+                
+                <div class="flex justify-center">
+                    <button id="ready-btn" class="btn-primary py-3 px-8 rounded-lg text-white font-bold pulse">Ready</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Game Screen -->
+        <div id="game-screen" class="hidden max-w-4xl mx-auto">
+            <!-- Topic Display -->
+            <div id="topic-display" class="card bg-white rounded-xl p-6 mb-6 text-center hidden fade-in">
+                <h3 class="text-xl font-bold text-gray-800 mb-2">The topic is:</h3>
+                <div id="topic-image-container" class="w-full h-48 bg-gray-100 rounded-lg mb-4 flex items-center justify-center overflow-hidden">
+                    <img id="topic-image" src="" alt="Topic image" class="max-h-full max-w-full object-contain">
+                </div>
+                <p id="topic-text" class="text-2xl font-bold text-purple-600">Football</p>
+                <p class="text-gray-500 mt-2">Remember: One player sees nothing!</p>
+            </div>
+            
+            <!-- Impostor View -->
+            <div id="impostor-view" class="card bg-white rounded-xl p-6 mb-6 text-center hidden fade-in">
+                <div class="w-20 h-20 mx-auto mb-4 bg-gradient-to-r from-red-500 to-pink-500 rounded-full flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                    </svg>
+                </div>
+                <h3 class="text-2xl font-bold text-gray-800 mb-2">You are the Impostor!</h3>
+                <p class="text-gray-600">You don't see the topic. Try to blend in with your word choices!</p>
+            </div>
+            
+            <!-- Game Status -->
+            <div id="game-status" class="card bg-white rounded-xl p-4 mb-6 text-center hidden fade-in">
+                <p id="current-status" class="text-lg font-medium text-gray-800">Waiting for players to submit words...</p>
+                <div id="turn-indicator" class="mt-2 flex justify-center items-center space-x-2 hidden">
+                    <div class="w-3 h-3 rounded-full bg-green-500 animate-pulse"></div>
+                    <span class="text-sm font-medium text-gray-600">It's your turn!</span>
+                </div>
+            </div>
+            
+            <!-- Word Submission -->
+            <div id="word-submission" class="card bg-white rounded-xl p-6 mb-6 hidden fade-in">
+                <h3 class="text-xl font-bold text-gray-800 mb-4">Submit your word</h3>
+                <div class="flex space-x-2">
+                    <input type="text" id="word-input" placeholder="Enter a word related to the topic" class="flex-grow px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
+                    <button id="submit-word-btn" class="btn-primary py-2 px-6 rounded-lg text-white font-bold">Submit</button>
+                </div>
+                <p id="word-error" class="text-red-500 text-sm mt-2 hidden">Please enter a word</p>
+            </div>
+            
+            <!-- Words Display -->
+            <div id="words-display" class="card bg-white rounded-xl p-6 mb-6 hidden fade-in">
+                <h3 class="text-xl font-bold text-gray-800 mb-4">Submitted Words</h3>
+                <div id="words-container" class="flex flex-wrap justify-center">
+                    <!-- Word bubbles will be added here -->
+                </div>
+            </div>
+            
+            <!-- Voting Phase -->
+            <div id="voting-phase" class="card bg-white rounded-xl p-6 mb-6 hidden fade-in">
+                <h3 class="text-xl font-bold text-gray-800 mb-4">Vote for the Impostor</h3>
+                <p class="text-gray-600 mb-4">Who do you think is the impostor?</p>
+                <div id="voting-options" class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <!-- Player voting cards will be added here -->
+                </div>
+                <p id="vote-error" class="text-red-500 text-sm mt-4 hidden">Please select a player to vote for</p>
+            </div>
+            
+            <!-- Results Display -->
+            <div id="results-display" class="card bg-white rounded-xl p-6 mb-6 hidden fade-in">
+                <div id="results-content" class="text-center">
+                    <!-- Results content will be added here -->
+                </div>
+                <div class="mt-6 flex justify-center">
+                    <button id="next-round-btn" class="btn-primary py-3 px-8 rounded-lg text-white font-bold">Next Round</button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white py-4 shadow-inner">
+        <div class="container mx-auto px-4 text-center text-gray-500 text-sm">
+            <p>Word Spy - A fun multiplayer deception game</p>
+        </div>
+    </footer>
+
+    <script>
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyDESK1oQ1lcWphlzlyqprcMRMpx-CqGS7s",
+            authDomain: "wordspy-f7440.firebaseapp.com",
+            projectId: "wordspy-f7440",
+            storageBucket: "wordspy-f7440.appspot.com",
+            messagingSenderId: "181466033426",
+            appId: "1:181466033426:web:a5fcd5f9ffde2baca817cb",
+            measurementId: "G-E5KEK1YFXH"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const rtdb = firebase.database();
+
+        // Game state variables
+        let playerId;
+        let playerName;
+        let roomCode;
+        let isHost = false;
+        let isImpostor = false;
+        let currentGameState = 'lobby'; // lobby, topic, submission, voting, results
+        let currentTopic = '';
+        let currentTopicImage = '';
+        let submittedWords = [];
+        let votes = {};
+        let playerVote = null;
+
+        // DOM elements
+        const homeScreen = document.getElementById('home-screen');
+        const lobbyScreen = document.getElementById('lobby-screen');
+        const gameScreen = document.getElementById('game-screen');
+        const playerInfo = document.getElementById('player-info');
+        const playerAvatar = document.getElementById('player-avatar');
+        const playerNameDisplay = document.getElementById('player-name');
+        const playerImpostorBadge = document.getElementById('player-impostor-badge');
+        const playerNameInput = document.getElementById('player-name-input');
+        const playerNameInputJoin = document.getElementById('player-name-input-join');
+        const roomCodeInput = document.getElementById('room-code-input');
+        const roomCodeDisplay = document.getElementById('room-code-display');
+        const copyRoomCodeBtn = document.getElementById('copy-room-code');
+        const playersList = document.getElementById('players-list');
+        const playerCount = document.getElementById('player-count');
+        const readyBtn = document.getElementById('ready-btn');
+        const createGameBtn = document.getElementById('create-game-btn');
+        const joinGameBtn = document.getElementById('join-game-btn');
+        const topicDisplay = document.getElementById('topic-display');
+        const impostorView = document.getElementById('impostor-view');
+        const topicImage = document.getElementById('topic-image');
+        const topicText = document.getElementById('topic-text');
+        const gameStatus = document.getElementById('game-status');
+        const currentStatus = document.getElementById('current-status');
+        const turnIndicator = document.getElementById('turn-indicator');
+        const wordSubmission = document.getElementById('word-submission');
+        const wordInput = document.getElementById('word-input');
+        const submitWordBtn = document.getElementById('submit-word-btn');
+        const wordError = document.getElementById('word-error');
+        const wordsDisplay = document.getElementById('words-display');
+        const wordsContainer = document.getElementById('words-container');
+        const votingPhase = document.getElementById('voting-phase');
+        const votingOptions = document.getElementById('voting-options');
+        const voteError = document.getElementById('vote-error');
+        const resultsDisplay = document.getElementById('results-display');
+        const resultsContent = document.getElementById('results-content');
+        const nextRoundBtn = document.getElementById('next-round-btn');
+
+        // Sample topics (in a real app, you'd fetch these from Firestore)
+        const topics = [
+            { name: "Football", image: "https://cdn-icons-png.flaticon.com/512/3022/3022699.png" },
+            { name: "Movies", image: "https://cdn-icons-png.flaticon.com/512/2809/2809678.png" },
+            { name: "Animals", image: "https://cdn-icons-png.flaticon.com/512/616/616408.png" },
+            { name: "Food", image: "https://cdn-icons-png.flaticon.com/512/3081/3081840.png" },
+            { name: "Travel", image: "https://cdn-icons-png.flaticon.com/512/2909/2909553.png" },
+            { name: "Music", image: "https://cdn-icons-png.flaticon.com/512/3659/3659899.png" }
+        ];
+
+        // Generate a random room code
+        function generateRoomCode() {
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+            let result = '';
+            for (let i = 0; i < 4; i++) {
+                result += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return result;
+        }
+
+        // Generate a random player ID
+        function generatePlayerId() {
+            return 'player-' + Math.random().toString(36).substr(2, 9);
+        }
+
+        // Show screen with animation
+        function showScreen(screen) {
+            const screens = [homeScreen, lobbyScreen, gameScreen];
+            screens.forEach(s => s.classList.add('hidden'));
+            
+            screen.classList.remove('hidden');
+            screen.classList.add('fade-in');
+            
+            // Trigger animation
+            setTimeout(() => {
+                screen.classList.remove('fade-in');
+            }, 500);
+        }
+
+        // Update player list in lobby
+        function updatePlayerList(players) {
+            playersList.innerHTML = '';
+            playerCount.textContent = players.length;
+            
+            players.forEach(player => {
+                const playerCard = document.createElement('div');
+                playerCard.className = `player-card bg-white rounded-lg p-3 shadow-sm flex flex-col items-center ${player.isImpostor ? 'impostor' : ''}`;
+                
+                const avatar = document.createElement('div');
+                avatar.className = 'w-12 h-12 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 flex items-center justify-center text-white font-bold mb-2';
+                avatar.textContent = player.name.charAt(0).toUpperCase();
+                
+                const name = document.createElement('span');
+                name.className = 'font-medium text-gray-800';
+                name.textContent = player.name;
+                
+                const status = document.createElement('div');
+                status.className = 'flex items-center mt-1';
+                
+                const statusDot = document.createElement('div');
+                statusDot.className = `w-2 h-2 rounded-full mr-1 ${player.isReady ? 'bg-green-500' : 'bg-gray-300'}`;
+                
+                const statusText = document.createElement('span');
+                statusText.className = 'text-xs text-gray-500';
+                statusText.textContent = player.isReady ? 'Ready' : 'Waiting';
+                
+                status.appendChild(statusDot);
+                status.appendChild(statusText);
+                
+                // Only show impostor badge to the impostor themselves
+                if (player.isImpostor && player.id === playerId) {
+                    const impostorBadge = document.createElement('div');
+                    impostorBadge.className = 'mt-1 text-xs px-2 py-1 bg-gradient-to-r from-red-500 to-pink-500 text-white rounded-full';
+                    impostorBadge.textContent = 'Impostor';
+                    playerCard.appendChild(impostorBadge);
+                }
+                
+                playerCard.appendChild(avatar);
+                playerCard.appendChild(name);
+                playerCard.appendChild(status);
+                
+                playersList.appendChild(playerCard);
+            });
+        }
+
+        // Create a new game room
+        async function createGameRoom() {
+            playerName = playerNameInput.value.trim();
+            if (!playerName) {
+                alert('Please enter your name');
+                return;
+            }
+            
+            playerId = generatePlayerId();
+            roomCode = generateRoomCode();
+            isHost = true;
+            
+            // Update UI
+            playerAvatar.textContent = playerName.charAt(0).toUpperCase();
+            playerNameDisplay.textContent = playerName;
+            playerInfo.classList.remove('hidden');
+            roomCodeDisplay.textContent = roomCode;
+            
+            try {
+                // Create room in Firestore
+                await db.collection('rooms').doc(roomCode).set({
+                    code: roomCode,
+                    hostId: playerId,
+                    gameState: 'lobby',
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    currentRound: 0
+                });
+                
+                // Add player to Realtime Database
+                await rtdb.ref(`rooms/${roomCode}/players/${playerId}`).set({
+                    id: playerId,
+                    name: playerName,
+                    isReady: false,
+                    isImpostor: false,
+                    hasSubmitted: false,
+                    vote: null
+                });
+                
+                // Listen for room changes
+                setupRoomListeners();
+                
+                // Show lobby screen
+                showScreen(lobbyScreen);
+            } catch (error) {
+                console.error("Error creating game room:", error);
+                alert("Failed to create game room. Please try again.");
+            }
+        }
+
+        // Join an existing game room
+        async function joinGameRoom() {
+            playerName = playerNameInputJoin.value.trim();
+            roomCode = roomCodeInput.value.trim().toUpperCase();
+            
+            if (!playerName) {
+                alert('Please enter your name');
+                return;
+            }
+            
+            if (!roomCode || roomCode.length !== 4) {
+                alert('Please enter a valid room code');
+                return;
+            }
+            
+            playerId = generatePlayerId();
+            
+            try {
+                // Check if room exists
+                const roomDoc = await db.collection('rooms').doc(roomCode).get();
+                if (!roomDoc.exists) {
+                    alert('Room not found. Please check the code and try again.');
+                    return;
+                }
+                
+                // Check if room is full (max 8 players)
+                const playersSnapshot = await rtdb.ref(`rooms/${roomCode}/players`).once('value');
+                if (playersSnapshot.val() && Object.keys(playersSnapshot.val()).length >= 8) {
+                    alert('This room is full (max 8 players)');
+                    return;
+                }
+                
+                // Update UI
+                playerAvatar.textContent = playerName.charAt(0).toUpperCase();
+                playerNameDisplay.textContent = playerName;
+                playerInfo.classList.remove('hidden');
+                roomCodeDisplay.textContent = roomCode;
+                
+                // Add player to Realtime Database
+                await rtdb.ref(`rooms/${roomCode}/players/${playerId}`).set({
+                    id: playerId,
+                    name: playerName,
+                    isReady: false,
+                    isImpostor: false,
+                    hasSubmitted: false,
+                    vote: null
+                });
+                
+                // Listen for room changes
+                setupRoomListeners();
+                
+                // Show lobby screen
+                showScreen(lobbyScreen);
+            } catch (error) {
+                console.error("Error joining game room:", error);
+                alert("Failed to join game room. Please try again.");
+            }
+        }
+
+        // Set up listeners for room changes
+        function setupRoomListeners() {
+            // Listen for player changes
+            rtdb.ref(`rooms/${roomCode}/players`).on('value', (snapshot) => {
+                const players = snapshot.val();
+                if (players) {
+                    const playersArray = Object.values(players);
+                    updatePlayerList(playersArray);
+                    
+                    // Check if current player is impostor
+                    const currentPlayer = playersArray.find(p => p.id === playerId);
+                    if (currentPlayer) {
+                        isImpostor = currentPlayer.isImpostor;
+                        if (isImpostor) {
+                            playerImpostorBadge.classList.remove('hidden');
+                        } else {
+                            playerImpostorBadge.classList.add('hidden');
+                        }
+                    }
+                }
+            });
+            
+            // Listen for game state changes
+            db.collection('rooms').doc(roomCode).onSnapshot((doc) => {
+                if (doc.exists) {
+                    const roomData = doc.data();
+                    currentGameState = roomData.gameState;
+                    
+                    switch (currentGameState) {
+                        case 'topic':
+                            showTopicPhase(roomData.currentTopic, roomData.currentTopicImage, roomData.currentPlayerTurn);
+                            break;
+                        case 'submission':
+                            showSubmissionPhase(roomData.currentPlayerTurn);
+                            break;
+                        case 'voting':
+                            showVotingPhase();
+                            break;
+                        case 'results':
+                            showResultsPhase(roomData.votingResults, roomData.impostorId);
+                            break;
+                        default:
+                            // Lobby state
+                            break;
+                    }
+                }
+            });
+            
+            // Listen for submitted words
+            rtdb.ref(`rooms/${roomCode}/submittedWords`).on('value', (snapshot) => {
+                const words = snapshot.val();
+                if (words) {
+                    submittedWords = Object.values(words);
+                    updateWordsDisplay(submittedWords);
+                }
+            });
+        }
+
+        // Toggle player ready state
+        async function toggleReady() {
+            try {
+                const playerRef = rtdb.ref(`rooms/${roomCode}/players/${playerId}`);
+                const playerSnapshot = await playerRef.once('value');
+                const playerData = playerSnapshot.val();
+                
+                await playerRef.update({
+                    isReady: !playerData.isReady
+                });
+                
+                // If host and all players are ready, start the game
+                if (isHost && playerData.isReady === false) {
+                    const playersSnapshot = await rtdb.ref(`rooms/${roomCode}/players`).once('value');
+                    const players = playersSnapshot.val();
+                    const allReady = Object.values(players).every(p => p.isReady);
+                    
+                    if (allReady && Object.keys(players).length >= 3) {
+                        startGame();
+                    }
+                }
+            } catch (error) {
+                console.error("Error toggling ready state:", error);
+            }
+        }
+
+        // Start the game (host only)
+        async function startGame() {
+            try {
+                // Select a random topic
+                const randomTopic = topics[Math.floor(Math.random() * topics.length)];
+                
+                // Select a random impostor
+                const playersSnapshot = await rtdb.ref(`rooms/${roomCode}/players`).once('value');
+                const players = playersSnapshot.val();
+                const playerIds = Object.keys(players);
+                const impostorId = playerIds[Math.floor(Math.random() * playerIds.length)];
+                
+                // Mark the impostor
+                await rtdb.ref(`rooms/${roomCode}/players/${impostorId}`).update({
+                    isImpostor: true
+                });
+                
+                // Set first player turn (random)
+                const firstPlayerTurn = playerIds[Math.floor(Math.random() * playerIds.length)];
+                
+                // Update game state in Firestore
+                await db.collection('rooms').doc(roomCode).update({
+                    gameState: 'topic',
+                    currentTopic: randomTopic.name,
+                    currentTopicImage: randomTopic.image,
+                    impostorId: impostorId,
+                    currentPlayerTurn: firstPlayerTurn,
+                    currentRound: 1,
+                    votingResults: null
+                });
+                
+                // Clear any previous words
+                await rtdb.ref(`rooms/${roomCode}/submittedWords`).remove();
+                
+                // Show game screen
+                showScreen(gameScreen);
+            } catch (error) {
+                console.error("Error starting game:", error);
+                alert("Failed to start game. Please try again.");
+            }
+        }
+
+        // Show topic phase
+        function showTopicPhase(topic, topicImageUrl, currentPlayerTurn) {
+            // Hide all game sections first
+            topicDisplay.classList.add('hidden');
+            impostorView.classList.add('hidden');
+            gameStatus.classList.add('hidden');
+            wordSubmission.classList.add('hidden');
+            wordsDisplay.classList.add('hidden');
+            votingPhase.classList.add('hidden');
+            resultsDisplay.classList.add('hidden');
+            
+            // Show appropriate view based on if player is impostor
+            if (isImpostor) {
+                impostorView.classList.remove('hidden');
+            } else {
+                topicDisplay.classList.remove('hidden');
+                topicText.textContent = topic;
+                topicImage.src = topicImageUrl;
+            }
+            
+            // Show game status
+            gameStatus.classList.remove('hidden');
+            currentStatus.textContent = isImpostor ? 
+                "The topic is being shown to other players..." : 
+                "Memorize the topic! The impostor sees nothing.";
+            
+            // After 5 seconds, move to submission phase
+            setTimeout(async () => {
+                try {
+                    await db.collection('rooms').doc(roomCode).update({
+                        gameState: 'submission'
+                    });
+                } catch (error) {
+                    console.error("Error moving to submission phase:", error);
+                }
+            }, 5000);
+        }
+
+        // Show submission phase
+        function showSubmissionPhase(currentPlayerTurn) {
+            // Hide all game sections first
+            topicDisplay.classList.add('hidden');
+            impostorView.classList.add('hidden');
+            gameStatus.classList.add('hidden');
+            wordSubmission.classList.add('hidden');
+            wordsDisplay.classList.add('hidden');
+            votingPhase.classList.add('hidden');
+            resultsDisplay.classList.add('hidden');
+            
+            // Show game status
+            gameStatus.classList.remove('hidden');
+            
+            // Show word submission if it's this player's turn
+            if (currentPlayerTurn === playerId) {
+                wordSubmission.classList.remove('hidden');
+                turnIndicator.classList.remove('hidden');
+                currentStatus.textContent = "It's your turn! Submit a word related to the topic.";
+            } else {
+                turnIndicator.classList.add('hidden');
+                currentStatus.textContent = "Waiting for another player to submit their word...";
+            }
+            
+            // Show words if any have been submitted
+            if (submittedWords.length > 0) {
+                wordsDisplay.classList.remove('hidden');
+            }
+        }
+
+        // Submit a word
+        async function submitWord() {
+            const word = wordInput.value.trim();
+            if (!word) {
+                wordError.classList.remove('hidden');
+                return;
+            }
+            
+            wordError.classList.add('hidden');
+            
+            try {
+                // Add word to submitted words
+                await rtdb.ref(`rooms/${roomCode}/submittedWords`).push({
+                    playerId: playerId,
+                    playerName: playerName,
+                    word: word
+                });
+                
+                // Mark player as submitted
+                await rtdb.ref(`rooms/${roomCode}/players/${playerId}`).update({
+                    hasSubmitted: true
+                });
+                
+                // Clear input
+                wordInput.value = '';
+                
+                // Determine next player turn
+                const playersSnapshot = await rtdb.ref(`rooms/${roomCode}/players`).once('value');
+                const players = playersSnapshot.val();
+                const playerIds = Object.keys(players);
+                const currentIndex = playerIds.indexOf(playerId);
+                let nextPlayerId = null;
+                
+                // Find next player who hasn't submitted yet
+                for (let i = 1; i < playerIds.length; i++) {
+                    const nextIndex = (currentIndex + i) % playerIds.length;
+                    const nextPlayer = players[playerIds[nextIndex]];
+                    if (!nextPlayer.hasSubmitted) {
+                        nextPlayerId = playerIds[nextIndex];
+                        break;
+                    }
+                }
+                
+                if (nextPlayerId) {
+                    // Move to next player
+                    await db.collection('rooms').doc(roomCode).update({
+                        currentPlayerTurn: nextPlayerId
+                    });
+                } else {
+                    // All players have submitted, move to voting phase
+                    await db.collection('rooms').doc(roomCode).update({
+                        gameState: 'voting'
+                    });
+                    
+                    // Reset player submission states for next round
+                    const updates = {};
+                    playerIds.forEach(id => {
+                        updates[`${id}/hasSubmitted`] = false;
+                        updates[`${id}/vote`] = null;
+                    });
+                    await rtdb.ref(`rooms/${roomCode}/players`).update(updates);
+                }
+            } catch (error) {
+                console.error("Error submitting word:", error);
+                alert("Failed to submit word. Please try again.");
+            }
+        }
+
+        // Update words display
+        function updateWordsDisplay(words) {
+            wordsContainer.innerHTML = '';
+            
+            words.forEach(wordObj => {
+                const wordBubble = document.createElement('div');
+                wordBubble.className = 'word-bubble';
+                wordBubble.innerHTML = `
+                    <div class="text-sm text-gray-500 mb-1">${wordObj.playerName}</div>
+                    <div class="text-lg font-bold text-gray-800">${wordObj.word}</div>
+                `;
+                wordsContainer.appendChild(wordBubble);
+            });
+            
+            if (words.length > 0) {
+                wordsDisplay.classList.remove('hidden');
+            }
+        }
+
+        // Show voting phase
+        async function showVotingPhase() {
+            // Hide all game sections first
+            topicDisplay.classList.add('hidden');
+            impostorView.classList.add('hidden');
+            gameStatus.classList.add('hidden');
+            wordSubmission.classList.add('hidden');
+            wordsDisplay.classList.add('hidden');
+            votingPhase.classList.add('hidden');
+            resultsDisplay.classList.add('hidden');
+            
+            // Show words
+            wordsDisplay.classList.remove('hidden');
+            
+            // Show voting options
+            votingPhase.classList.remove('hidden');
+            votingOptions.innerHTML = '';
+            voteError.classList.add('hidden');
+            
+            try {
+                const playersSnapshot = await rtdb.ref(`rooms/${roomCode}/players`).once('value');
+                const players = playersSnapshot.val();
+                
+                Object.values(players).forEach(player => {
+                    if (player.id !== playerId) { // Can't vote for yourself
+                        const playerCard = document.createElement('div');
+                        playerCard.className = 'player-card bg-white rounded-lg p-4 shadow-sm flex flex-col items-center cursor-pointer hover:bg-gray-50';
+                        playerCard.dataset.playerId = player.id;
+                        
+                        const avatar = document.createElement('div');
+                        avatar.className = 'w-12 h-12 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 flex items-center justify-center text-white font-bold mb-2';
+                        avatar.textContent = player.name.charAt(0).toUpperCase();
+                        
+                        const name = document.createElement('span');
+                        name.className = 'font-medium text-gray-800';
+                        name.textContent = player.name;
+                        
+                        playerCard.appendChild(avatar);
+                        playerCard.appendChild(name);
+                        
+                        playerCard.addEventListener('click', () => castVote(player.id));
+                        
+                        votingOptions.appendChild(playerCard);
+                    }
+                });
+                
+                // Show game status
+                gameStatus.classList.remove('hidden');
+                currentStatus.textContent = "Vote for who you think is the impostor!";
+            } catch (error) {
+                console.error("Error showing voting phase:", error);
+            }
+        }
+
+        // Cast a vote
+        async function castVote(votedPlayerId) {
+            if (playerVote !== null) {
+                voteError.textContent = "You've already voted!";
+                voteError.classList.remove('hidden');
+                return;
+            }
+            
+            playerVote = votedPlayerId;
+            voteError.classList.add('hidden');
+            
+            try {
+                // Update player vote
+                await rtdb.ref(`rooms/${roomCode}/players/${playerId}`).update({
+                    vote: votedPlayerId
+                });
+                
+                // Check if all players have voted
+                const playersSnapshot = await rtdb.ref(`rooms/${roomCode}/players`).once('value');
+                const players = playersSnapshot.val();
+                const allVoted = Object.values(players).every(p => p.vote !== null);
+                
+                if (allVoted && isHost) {
+                    // Calculate voting results
+                    const votes = {};
+                    Object.values(players).forEach(player => {
+                        if (player.vote) {
+                            votes[player.vote] = (votes[player.vote] || 0) + 1;
+                        }
+                    });
+                    
+                    // Get room data to find impostor
+                    const roomDoc = await db.collection('rooms').doc(roomCode).get();
+                    const roomData = roomDoc.data();
+                    const impostorId = roomData.impostorId;
+                    
+                    // Determine if impostor was caught
+                    let impostorCaught = false;
+                    
+                    // Find player with most votes
+                    let maxVotes = 0;
+                    let mostVotedPlayer = null;
+                    for (const [playerId, voteCount] of Object.entries(votes)) {
+                        if (voteCount > maxVotes) {
+                            maxVotes = voteCount;
+                            mostVotedPlayer = playerId;
+                        }
+                    }
+                    
+                    if (mostVotedPlayer === impostorId) {
+                        impostorCaught = true;
+                    }
+                    
+                    // Update game state with results
+                    await db.collection('rooms').doc(roomCode).update({
+                        gameState: 'results',
+                        votingResults: {
+                            votes: votes,
+                            impostorCaught: impostorCaught,
+                            impostorId: impostorId
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error("Error casting vote:", error);
+            }
+        }
+
+        // Show results phase
+        async function showResultsPhase(votingResults, impostorId) {
+            // Hide all game sections first
+            topicDisplay.classList.add('hidden');
+            impostorView.classList.add('hidden');
+            gameStatus.classList.add('hidden');
+            wordSubmission.classList.add('hidden');
+            wordsDisplay.classList.add('hidden');
+            votingPhase.classList.add('hidden');
+            resultsDisplay.classList.add('hidden');
+            
+            // Show results
+            resultsDisplay.classList.remove('hidden');
+            
+            const impostorCaught = votingResults.impostorCaught;
+            const votes = votingResults.votes;
+            
+            try {
+                // Get all players to display names
+                const playersSnapshot = await rtdb.ref(`rooms/${roomCode}/players`).once('value');
+                const players = playersSnapshot.val();
+                
+                // Get impostor details
+                const impostor = players[impostorId];
+                
+                // Build results content
+                let resultsHTML = '';
+                
+                if (impostorCaught) {
+                    resultsHTML = `
+                        <div class="mb-6">
+                            <div class="w-20 h-20 mx-auto mb-4 bg-gradient-to-r from-green-500 to-teal-500 rounded-full flex items-center justify-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                                </svg>
+                            </div>
+                            <h3 class="text-2xl font-bold text-gray-800 mb-2">The impostor was caught!</h3>
+                            <p class="text-gray-600">The group wins this round!</p>
+                        </div>
+                    `;
+                } else {
+                    resultsHTML = `
+                        <div class="mb-6">
+                            <div class="w-20 h-20 mx-auto mb-4 bg-gradient-to-r from-red-500 to-pink-500 rounded-full flex items-center justify-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </div>
+                            <h3 class="text-2xl font-bold text-gray-800 mb-2">The impostor got away!</h3>
+                            <p class="text-gray-600">The impostor wins this round!</p>
+                        </div>
+                    `;
+                }
+                
+                // Show voting breakdown
+                resultsHTML += `
+                    <div class="mb-6">
+                        <h4 class="text-lg font-bold text-gray-800 mb-3">Voting Results</h4>
+                        <div class="space-y-2">
+                `;
+                
+                for (const [playerId, voteCount] of Object.entries(votes)) {
+                    const player = players[playerId];
+                    
+                    resultsHTML += `
+                        <div class="flex justify-between items-center bg-gray-50 rounded-lg px-4 py-2">
+                            <span class="font-medium">${player.name}</span>
+                            <span class="text-gray-600">${voteCount} vote${voteCount !== 1 ? 's' : ''}</span>
+                        </div>
+                    `;
+                }
+                
+                resultsHTML += `
+                        </div>
+                    </div>
+                `;
+                
+                // Reveal who the impostor was
+                resultsHTML += `
+                    <div class="bg-gradient-to-r from-red-50 to-pink-50 rounded-xl p-4">
+                        <h4 class="text-lg font-bold text-gray-800 mb-2">The impostor was:</h4>
+                        <div class="flex items-center space-x-3">
+                            <div class="w-10 h-10 rounded-full bg-gradient-to-r from-red-500 to-pink-500 flex items-center justify-center text-white font-bold">
+                                ${impostor.name.charAt(0).toUpperCase()}
+                            </div>
+                            <span class="font-medium">${impostor.name}</span>
+                        </div>
+                    </div>
+                `;
+                
+                resultsContent.innerHTML = resultsHTML;
+                
+                // Reset player vote for next round
+                playerVote = null;
+            } catch (error) {
+                console.error("Error showing results:", error);
+                resultsContent.innerHTML = `<p class="text-red-500">Error loading results. Please try again.</p>`;
+            }
+        }
+
+        // Start next round
+        async function nextRound() {
+            if (!isHost) return;
+            
+            try {
+                // Reset game state for next round
+                await db.collection('rooms').doc(roomCode).update({
+                    gameState: 'lobby'
+                });
+                
+                // Reset player ready states
+                const playersSnapshot = await rtdb.ref(`rooms/${roomCode}/players`).once('value');
+                const players = playersSnapshot.val();
+                const updates = {};
+                
+                Object.keys(players).forEach(playerId => {
+                    updates[`${playerId}/isReady`] = false;
+                    updates[`${playerId}/isImpostor`] = false;
+                    updates[`${playerId}/hasSubmitted`] = false;
+                    updates[`${playerId}/vote`] = null;
+                });
+                
+                await rtdb.ref(`rooms/${roomCode}/players`).update(updates);
+                
+                // Clear submitted words
+                await rtdb.ref(`rooms/${roomCode}/submittedWords`).remove();
+                
+                // Show lobby screen
+                showScreen(lobbyScreen);
+            } catch (error) {
+                console.error("Error starting next round:", error);
+                alert("Failed to start next round. Please try again.");
+            }
+        }
+
+        // Event listeners
+        createGameBtn.addEventListener('click', createGameRoom);
+        joinGameBtn.addEventListener('click', joinGameRoom);
+        readyBtn.addEventListener('click', toggleReady);
+        copyRoomCodeBtn.addEventListener('click', () => {
+            navigator.clipboard.writeText(roomCode);
+            copyRoomCodeBtn.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                </svg>
+                <span>Copied!</span>
+            `;
+            setTimeout(() => {
+                copyRoomCodeBtn.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
+                        <path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" />
+                    </svg>
+                    <span>Copy Code</span>
+                `;
+            }, 2000);
+        });
+        submitWordBtn.addEventListener('click', submitWord);
+        wordInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') submitWord();
+        });
+        nextRoundBtn.addEventListener('click', nextRound);
+
+        // Initialize animations
+        document.querySelectorAll('.card').forEach((card, index) => {
+            anime({
+                targets: card,
+                opacity: [0, 1],
+                translateY: [20, 0],
+                delay: index * 100,
+                easing: 'easeOutExpo'
+            });
+        });
+    </script>
+</body>
+</html>
